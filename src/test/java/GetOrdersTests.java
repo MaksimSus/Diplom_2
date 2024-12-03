@@ -1,3 +1,4 @@
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.qameta.allure.Step;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
@@ -6,27 +7,34 @@ import org.junit.Before;
 import org.junit.Test;
 import io.qameta.allure.junit4.DisplayName;
 
+import java.util.List;
+
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.equalTo;
 
-public class LoginTests {
+public class GetOrdersTests {
 
-    private String email; // Будет рандомный
+    private String email; // Будет рандомным
     private String password = "validpassword";
-    private String invalidEmail = "invalid@example.com";
-    private String invalidPassword = "invalidpassword";
+    private String name = "Valid User";
     private String accessToken;
 
     @Before
     public void setup() {
         RestAssured.baseURI = "https://stellarburgers.nomoreparties.site";
-        email = generateUniqueEmail(); // Генерируем рандомный email
-        createUser(email, password, "Valid User"); // Создаем пользователя
+        email = generateUniqueEmail(); // Генерация email
+        createUser(email, password, name); // Создаем пользователя
+        accessToken = loginUser(email, password) // Авторизация
+                .then()
+                .extract()
+                .path("accessToken"); // Получаем токен
+        createOrder(accessToken, List.of("61c0c5a71d1f82001bdaaa6d")); // Создаем заказ
     }
 
     @After
     public void tearDown() {
-        // Удаляем пользователя
+        // Очистка после тестов
         if (accessToken != null) {
             deleteUser(accessToken);
             accessToken = null;
@@ -34,41 +42,29 @@ public class LoginTests {
     }
 
     @Test
-    @DisplayName("Login with valid credentials")
-    public void loginWithValidCredentials() {
-        //Проверяет успешный логин с корректными данными.
-        accessToken = loginUser(email, password)
+    @DisplayName("Get orders for authorized user")
+    public void getOrdersForAuthorizedUser() {
+        // Получение заказов авторизованным пользователем
+        getOrders(accessToken)
                 .then()
                 .statusCode(200)
                 .body("success", equalTo(true))
-                .body("user.email", equalTo(email))
-                .extract()
-                .path("accessToken");
+                .body("orders", notNullValue());
     }
 
     @Test
-    @DisplayName("Login with invalid email")
-    public void loginWithInvalidEmail() {
-        //Проверяет ошибку логина при неверном email.
-        loginUser(invalidEmail, password)
+    @DisplayName("Fail to get orders without authorization")
+    public void failToGetOrdersWithoutAuthorization() {
+        // Попытка получить заказы без авторизации
+        getOrders("")
                 .then()
                 .statusCode(401)
-                .body("message", equalTo("email or password are incorrect"));
+                .body("message", equalTo("You should be authorised"));
     }
 
-    @Test
-    @DisplayName("Login with invalid password")
-    public void loginWithInvalidPassword() {
-        // Проверяет ошибку логина при неверном пароле.
-        loginUser(email, invalidPassword)
-                .then()
-                .statusCode(401)
-                .body("message", equalTo("email or password are incorrect"));
-    }
-
-    @Step("Login user with email: {email} and password: {password}")
+    @Step("Login user with email: {email}")
     private Response loginUser(String email, String password) {
-        // Выполняем авторизацию пользователя
+        // Логиним пользователя
         return given()
                 .header("Content-type", "application/json")
                 .body(new LoginRequest(email, password))
@@ -90,6 +86,27 @@ public class LoginTests {
         }
     }
 
+    @Step("Create order with ingredients")
+    private Response createOrder(String accessToken, List<String> ingredients) {
+        // Создаем заказ
+        return given()
+                .header("Content-type", "application/json")
+                .header("Authorization", accessToken == null ? "" : accessToken)
+                .body(new OrderRequest(ingredients))
+                .when()
+                .post("/api/orders");
+    }
+
+    @Step("Get orders for user")
+    private Response getOrders(String accessToken) {
+        // Получаем заказы пользователя
+        return given()
+                .header("Content-type", "application/json")
+                .header("Authorization", accessToken == null ? "" : accessToken)
+                .when()
+                .get("/api/orders");
+    }
+
     @Step("Delete user with token")
     private void deleteUser(String accessToken) {
         // Удаляем пользователя
@@ -102,14 +119,19 @@ public class LoginTests {
     }
 
     private String generateUniqueEmail() {
-        // Генерируем уникальную почту
+        // Генерация уникального email
         return "user" + System.currentTimeMillis() + "@example.com";
     }
 
     private static class User {
         // Класс создания пользователя
+        @JsonProperty("email")
         private final String email;
+
+        @JsonProperty("password")
         private final String password;
+
+        @JsonProperty("name")
         private final String name;
 
         public User(String email, String password, String name) {
@@ -117,36 +139,29 @@ public class LoginTests {
             this.password = password;
             this.name = name;
         }
-
-        public String getEmail() {
-            return email;
-        }
-
-        public String getPassword() {
-            return password;
-        }
-
-        public String getName() {
-            return name;
-        }
     }
 
-    // Класс для тела запроса логина
     private static class LoginRequest {
+        // Класс логина
+        @JsonProperty("email")
         private final String email;
+
+        @JsonProperty("password")
         private final String password;
 
         public LoginRequest(String email, String password) {
             this.email = email;
             this.password = password;
         }
+    }
 
-        public String getEmail() {
-            return email;
-        }
+    private static class OrderRequest {
+        // Класс заказа
+        @JsonProperty("ingredients")
+        private final List<String> ingredients;
 
-        public String getPassword() {
-            return password;
+        public OrderRequest(List<String> ingredients) {
+            this.ingredients = ingredients;
         }
     }
 }
