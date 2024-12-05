@@ -27,10 +27,6 @@ public class CreateOrderTests {
         RestAssured.baseURI = "https://stellarburgers.nomoreparties.site";
         email = generateUniqueEmail(); // Генерируем email
         createUser(email, password, name); // Создаем пользователя
-        accessToken = loginUser(email, password) // Авторизуемся
-                .then()
-                .extract()
-                .path("accessToken"); // Получаем токен
     }
 
     @After
@@ -90,19 +86,11 @@ public class CreateOrderTests {
                 .when()
                 .post("/api/auth/register");
 
-        if (response.getStatusCode() != 200) {
+        if (response.getStatusCode() == 200) {
+            accessToken = response.jsonPath().getString("accessToken");
+        } else {
             throw new RuntimeException("Failed to create user: " + response.getBody().asString());
         }
-    }
-
-    @Step("Login user with email: {email}")
-    private Response loginUser(String email, String password) {
-        // Логиним пользователя
-        return given()
-                .header("Content-type", "application/json")
-                .body(new LoginRequest(email, password))
-                .when()
-                .post("/api/auth/login");
     }
 
     @Step("Create order with ingredients")

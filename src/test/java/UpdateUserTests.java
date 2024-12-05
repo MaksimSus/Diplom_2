@@ -22,10 +22,6 @@ public class UpdateUserTests {
         RestAssured.baseURI = "https://stellarburgers.nomoreparties.site";
         email = generateUniqueEmail(); // Генерация email
         createUser(email, password, name); // Создаем пользователя
-        accessToken = loginUser(email, password) // Логинимся
-                .then()
-                .extract()
-                .path("accessToken"); // Получаем токен
     }
 
     @After
@@ -105,16 +101,6 @@ public class UpdateUserTests {
                 .body("message", equalTo("You should be authorised"));
     }
 
-    @Step("Login user with email: {email}")
-    private Response loginUser(String email, String password) {
-        // Логиним пользователя
-        return given()
-                .header("Content-type", "application/json")
-                .body(new LoginRequest(email, password))
-                .when()
-                .post("/api/auth/login");
-    }
-
     @Step("Create user with email: {email}")
     private void createUser(String email, String password, String name) {
         // Создаем пользователя
@@ -124,7 +110,9 @@ public class UpdateUserTests {
                 .when()
                 .post("/api/auth/register");
 
-        if (response.getStatusCode() != 200) {
+        if (response.getStatusCode() == 200) {
+            accessToken = response.jsonPath().getString("accessToken");
+        } else {
             throw new RuntimeException("Failed to create user: " + response.getBody().asString());
         }
     }

@@ -115,7 +115,7 @@ public class UserTests {
                 .statusCode(200);
     }
 
-    // Класс для тела запроса создания пользователя
+    // Класс создания пользователя
     private static class User {
         @JsonProperty("email")
         private final String email;

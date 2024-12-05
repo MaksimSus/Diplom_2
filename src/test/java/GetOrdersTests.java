@@ -25,10 +25,6 @@ public class GetOrdersTests {
         RestAssured.baseURI = "https://stellarburgers.nomoreparties.site";
         email = generateUniqueEmail(); // Генерация email
         createUser(email, password, name); // Создаем пользователя
-        accessToken = loginUser(email, password) // Авторизация
-                .then()
-                .extract()
-                .path("accessToken"); // Получаем токен
         createOrder(accessToken, List.of("61c0c5a71d1f82001bdaaa6d")); // Создаем заказ
     }
 
@@ -81,7 +77,9 @@ public class GetOrdersTests {
                 .when()
                 .post("/api/auth/register");
 
-        if (response.getStatusCode() != 200) {
+        if (response.getStatusCode() == 200) {
+            accessToken = response.jsonPath().getString("accessToken");
+        } else {
             throw new RuntimeException("Failed to create user: " + response.getBody().asString());
         }
     }
@@ -110,12 +108,13 @@ public class GetOrdersTests {
     @Step("Delete user with token")
     private void deleteUser(String accessToken) {
         // Удаляем пользователя
-        given()
+        Response response = given()
                 .header("Authorization", accessToken)
                 .when()
-                .delete("/api/auth/user")
-                .then()
-                .statusCode(202);
+                .delete("/api/auth/user");
+        if (response.getStatusCode() != 202) {
+            throw new RuntimeException("Failed to delete user: " + response.getBody().asString());
+        }
     }
 
     private String generateUniqueEmail() {
