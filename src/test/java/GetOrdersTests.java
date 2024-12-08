@@ -58,16 +58,6 @@ public class GetOrdersTests {
                 .body("message", equalTo("You should be authorised"));
     }
 
-    @Step("Login user with email: {email}")
-    private Response loginUser(String email, String password) {
-        // Логиним пользователя
-        return given()
-                .header("Content-type", "application/json")
-                .body(new LoginRequest(email, password))
-                .when()
-                .post("/api/auth/login");
-    }
-
     @Step("Create user with email: {email}")
     private void createUser(String email, String password, String name) {
         // Создаем пользователя
